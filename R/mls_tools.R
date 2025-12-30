@@ -35,191 +35,177 @@ tableToMatrix <- function(df, meta) {
   list(ids=as.character(ids), mat=mat, df_orig=df)
 }
 
-# --- Fully Vectorized Matcher ---
+# --- Matcher ---
 
 stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, cellSize,
                           estX0, estY0, midXLocal=NULL, midYLocal=NULL) {
 
   wMat <- worldObj$mat
   lMat <- localObj$mat
+  nWorld <- nrow(wMat)
+  nLocal <- nrow(lMat)
 
-  # 1. Centers and Offsets
+  # FIX 1: Python calculates World Center via Bounding Box (Min+Max)/2, not Mean
+  wMin <- apply(wMat[,1:2], 2, min)
+  wMax <- apply(wMat[,1:2], 2, max)
+  wSize <- wMax - wMin
+
+  # Python Logic: estimatedPlotMiddleXWorld IS PASSED IN as estX0
+  # If estX0 is used, Python centers the grid around it.
   meanW <- c(estX0, estY0)
-  meanL <- if(is.null(midXLocal)) colMeans(lMat[,1:2, drop=FALSE]) else c(midXLocal, midYLocal)
 
-  # Center Local Points
+  # FIX 2: Local Center is Bounding Box Middle, NOT Centroid
+  if(is.null(midXLocal)) {
+    lMin <- apply(lMat[,1:2], 2, min)
+    lMax <- apply(lMat[,1:2], 2, max)
+    lSize <- lMax - lMin
+    meanL <- lMin + 0.5 * lSize
+  } else {
+    meanL <- c(midXLocal, midYLocal)
+  }
+
+  # Center Local Points relative to Bounding Box Middle
   lMatCentered <- lMat
   lMatCentered[,1] <- lMatCentered[,1] - meanL[1]
   lMatCentered[,2] <- lMatCentered[,2] - meanL[2]
 
-  # 2. Build World Spatial Index
-  # Use a grid size slightly larger than linkDist for safe bucketing
+  # 3. Build World Spatial Index
   gridW <- gridIndexCreate(wMat[,1:2, drop=FALSE], max(linkDist, 2.0))
 
-  # 3. Generate Search Space (The Grid)
-  # Angles
-  diagL <- sqrt(sum((apply(lMat[,1:2], 2, max) - apply(lMat[,1:2], 2, min))^2)) / 2
+  # 4. Generate Search Grid (Exact Python Replication)
+
+  # Angle Steps
+  # Python: diagLocal = sqrt( (0.5*DX)^2 + (0.5*DY)^2 )
+  lRange <- apply(lMat[,1:2], 2, max) - apply(lMat[,1:2], 2, min)
+  diagL <- sqrt( (0.5*lRange[1])^2 + (0.5*lRange[2])^2 )
   if(diagL == 0) diagL <- 1
+
   deltaThetaDeg <- (searchRes / diagL) * (180 / pi)
-  thetas <- unique(seq(0, 360, by=deltaThetaDeg) %% 360)
+  # Python: Ntheta = ceil(360 / delta)
+  Ntheta <- ceiling(360.0 / deltaThetaDeg)
+  # Python loop: k * deltaThetaDeg for k in 0..Ntheta
+  # Note: Python range is 0 to Ntheta-1
+  thetas <- (0:(Ntheta-1)) * deltaThetaDeg
 
-  # Translations
-  steps <- seq(-searchDist, searchDist, by=searchRes)
+  # Grid Steps
+  # Python: Nx = ceil( (2.0*searchDist) / res )
+  Nx <- ceiling( (2.0 * searchDist) / searchRes )
+  Ny <- ceiling( (2.0 * searchDist) / searchRes )
 
-  # Create a Master Grid of all (dx, dy, theta) combinations
-  # We construct this matrix once to avoid nested looping
-  grid_params <- expand.grid(dx=steps, dy=steps, theta=thetas)
-  n_sims <- nrow(grid_params)
+  # Python start offset: startXlocal = estX - searchDist
+  # The actual dx added to the centered local is:
+  # dx = (estX - searchDist - meanL_X) + i*res
+  # But we handle meanL subtraction in lMatCentered.
+  # So we just need the relative shift from World Center:
+  # shift = -searchDist + i*res
 
-  cat(sprintf("Evaluating %d hypotheses via Vectorization...\n", n_sims))
+  stepsX <- -searchDist + (0:(Nx-1)) * searchRes
+  stepsY <- -searchDist + (0:(Ny-1)) * searchRes
 
-  # 4. Batch Scoring Strategy
-  # Evaluating 100,000s of hypotheses on all points is memory heavy.
-  # We process 'Thetas' in chunks, but fully vectorize dX/dY within those chunks.
+  grid_params <- expand.grid(dx=stepsX, dy=stepsY, theta=thetas)
+
+  cat(sprintf("Evaluating %d hypotheses (Method: Exact Python Replication)...\n", nrow(grid_params)))
 
   bestWeight <- -1.0
   bestIdx <- 0
 
-  # Pre-compute Rotation Matrices for unique Thetas
-  # This avoids sin/cos calls inside the loop
+  # Pre-compute Rotations
   unique_thetas <- unique(grid_params$theta)
   rads <- unique_thetas * pi / 180
   cos_t <- cos(rads)
   sin_t <- sin(rads)
 
-  # Iterate over Unique Angles (Outer layer only)
   for(i in seq_along(unique_thetas)) {
     th <- unique_thetas[i]
     co <- cos_t[i]
     si <- sin_t[i]
 
-    # Rotate ALL Local points for this angle ONCE
-    # N_local x 2
+    # Rotate ALL local points
     rotX <- lMatCentered[,1] * co - lMatCentered[,2] * si
     rotY <- lMatCentered[,1] * si + lMatCentered[,2] * co
 
-    # Identify all grid entries that use this theta
-    # In 'expand.grid', the last column changes slowest, so these are usually contiguous blocks
-    # But strictly filtering is safer:
     subset_indices <- which(grid_params$theta == th)
     subset_dx <- grid_params$dx[subset_indices]
     subset_dy <- grid_params$dy[subset_indices]
-
-    # 5. The "Inner Loop" Replacement:
-    # Instead of shifting points and querying the grid for every dx/dy,
-    # We invert the logic:
-    # For every Local Point, which World Points are compatible *at all*?
-    # Then we check if the required translation (dx, dy) matches our grid.
-
-    # However, for dense grids, the "Forward" approach is usually better if we verify fast.
-    # Let's verify a batch of Translation Hypotheses against the Quad/Grid Index.
-
-    # To keep memory manageable, we loop through the translation candidates for this angle
-    # But we do NOT loop through points.
-
-    current_angle_best_w <- -1
-    current_angle_best_j <- 0
-
-    # Optimization: Check if match is even possible?
-    # Skip for now to ensure correctness.
 
     for(j in seq_along(subset_indices)) {
       dx <- subset_dx[j]
       dy <- subset_dy[j]
 
-      # Transform Local to World Est
+      # Transform to World Est
       currX <- rotX + meanW[1] + dx
       currY <- rotY + meanW[2] + dy
 
-      # --- Fast Score Kernel ---
-      # This is the critical hot path
-
-      # 1. Query Neighbors (Returns list of integer indices)
-      # gridIndexQueryBatch is heavily optimized in R_quadTree.R
+      # Query Neighbors
       candidates <- gridIndexQueryBatch(gridW, cbind(currX, currY), linkDist)
 
-      # 2. Compute Score
-      # To avoid R loop overhead here, we flatten the structure
-
-      # Identify which local points actually found a neighbor
       has_cand <- !vapply(candidates, is.null, logical(1))
-
       if(!any(has_cand)) next
 
-      valid_local_indices <- which(has_cand)
-      nValid <- length(valid_local_indices)
+      valid_indices <- which(has_cand)
 
-      # Extract data for valid matches only
-      # We need to process potentially multiple matches per local point
-      # This is hard to vectorise perfectly without a C++ extension,
-      # but we can do a "Nearest Neighbor" assumption for speed.
+      # Python One-to-One Logic
+      min_dw_per_world <- rep(Inf, nWorld)
 
-      score_acc <- 0
-
-      # We iterate only over valid points (subset of local)
-      # This is "Order(N_local_valid)" which is small
-      for(idx in valid_local_indices) {
+      for(idx in valid_indices) {
         cands <- candidates[[idx]]
 
-        # Calculate Squared Dists
         w_sub <- wMat[cands, , drop=FALSE]
         d2 <- (w_sub[,1] - currX[idx])^2 + (w_sub[,2] - currY[idx])^2
 
-        # Filter strict distance
         in_range <- d2 < (linkDist^2)
-        if(!any(in_range)) {
-          nValid <- nValid - 1
-          next
-        }
+        if(!any(in_range)) next
 
         cands <- cands[in_range]
         d_vals <- sqrt(d2[in_range])
 
-        # Weighted logic
         rL <- lMat[idx, 3]
         rW <- wMat[cands, 3]
-        ratio <- pmax(rL/rW, rW/rL)
+
+        ratio <- rep(1.0, length(cands))
+        valid_r <- (rL > 0.001 & rW > 0.001)
+        if(any(valid_r)) ratio[valid_r] <- pmax(rL/rW[valid_r], rW[valid_r]/rL)
+
         dw <- d_vals * ratio
 
-        # Best match for this stem
-        min_dw <- min(dw)
+        best_loc_idx <- which.min(dw)
+        best_w_id <- cands[best_loc_idx]
+        best_dw <- dw[best_loc_idx]
 
-        # Add to score accumulator (1 / (1+dw))
-        score_acc <- score_acc + (1.0 / (1.0 + min_dw))
+        if(best_dw < min_dw_per_world[best_w_id]) {
+          min_dw_per_world[best_w_id] <- best_dw
+        }
       }
 
-      if(nValid > 0) {
-        final_score <- score_acc / nValid
+      valid_matches <- min_dw_per_world[is.finite(min_dw_per_world)]
+
+      if(length(valid_matches) > 0) {
+        score_acc <- sum(1.0 / (1.0 + valid_matches))
+        final_score <- score_acc / nLocal
+
         if(final_score > bestWeight) {
           bestWeight <- final_score
-          bestIdx <- subset_indices[j] # Points to global grid_params
+          bestIdx <- subset_indices[j]
         }
       }
     }
   }
 
-  # Retrieve Best Params
   bestP <- grid_params[bestIdx, ]
   cat(sprintf("Best: W=%.4f, dx=%.2f, dy=%.2f, theta=%.2f\n",
               bestWeight, bestP$dx, bestP$dy, bestP$theta))
 
-  # --- Reconstruct Transform & Pairs (Exact Calculation) ---
-
-  # Rotate
+  # 5. Reconstruct Matches
   rad <- bestP$theta * pi / 180
   rotX <- lMatCentered[,1] * cos(rad) - lMatCentered[,2] * sin(rad)
   rotY <- lMatCentered[,1] * sin(rad) + lMatCentered[,2] * cos(rad)
-
-  # Translate
   finalX <- rotX + meanW[1] + bestP$dx
   finalY <- rotY + meanW[2] + bestP$dy
 
-  # Exact Matching (Pairs)
   candidates <- gridIndexQueryBatch(gridW, cbind(finalX, finalY), linkDist)
-  world_best <- vector("list", nrow(wMat))
+  world_best <- vector("list", nWorld)
 
-  # Fill Pairs
-  for(i in seq_len(nrow(lMat))) {
+  for(i in seq_len(nLocal)) {
     matches <- candidates[[i]]
     if(is.null(matches)) next
 
@@ -229,7 +215,14 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
     if(!any(valid)) next
 
     valid_idx <- matches[valid]
-    dw <- sqrt(d2[valid]) * pmax(lMat[i,3]/wMat[valid_idx,3], wMat[valid_idx,3]/lMat[i,3])
+    d_vals <- sqrt(d2[valid])
+
+    rL <- lMat[i, 3]; rW <- wMat[valid_idx, 3]
+    ratio <- rep(1.0, length(valid_idx))
+    valid_r <- (rL > 0.001 & rW > 0.001)
+    if(any(valid_r)) ratio[valid_r] <- pmax(rL/rW[valid_r], rW[valid_r]/rL)
+
+    dw <- d_vals * ratio
 
     best_loc <- which.min(dw)
     w_id <- valid_idx[best_loc]
@@ -243,11 +236,14 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
 
   final_pairs_idx <- which(!vapply(world_best, is.null, logical(1)))
 
-  # Matrix Calculation
   M <- diag(4)
+  l_indices <- integer(0)
+  w_indices <- integer(0)
+
   if(length(final_pairs_idx) > 2) {
     w_indices <- final_pairs_idx
     l_indices <- vapply(world_best[w_indices], function(x) x$localIdx, integer(1))
+
     M <- homogeneous2DSetTrafoFromVectors(
       lMat[l_indices, 1], lMat[l_indices, 2],
       wMat[w_indices, 1], wMat[w_indices, 2]
@@ -256,7 +252,6 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
 
   return(list(M=M, lIndices=l_indices, wIndices=w_indices))
 }
-
 
 # --- Wrapper ---
 
@@ -269,7 +264,6 @@ tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorl
   res <- stemListMatch(wObj, lObj, searchRes=1.0, searchDist=searchDist, linkDist=3.0,
                        cellSize=0.1, estX0=estX0, estY0=estY0)
 
-  # Apply Transforms and Links
   tbRes <- tbLocal
   pts <- as.matrix(tbRes[, c(metaLocal$lblX, metaLocal$lblY)])
   pts_trans <- homogeneousTrafoMatrix2D(res$M, pts)
@@ -283,6 +277,7 @@ tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorl
 
   if(length(res$lIndices) > 0) {
     tbRes$isLinked[res$lIndices] <- 1
+    # Vectorized assignment
     for(c in wCols) tbRes[res$lIndices, paste0(c, "_w")] <- tbWorld[res$wIndices, c]
   }
 

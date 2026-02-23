@@ -2,13 +2,23 @@
 
 # --- Matrix Utilities (Vectorized) ---
 
-# Create a 4x4 Identity Matrix
+#' @title Create a 4x4 Identity Matrix
+#' @description Create a 4x4 Identity Matrix.
+#'
+#' @return A 4x4 identity matrix.
+#' @export
 trafoMatrixCreateAsUnit <- function() {
   diag(4)
 }
 
-# Apply 2D transform to a matrix of points (N x 2 or N x 3)
-# Returns N x 2 matrix
+#' @title Apply 2D transform to a matrix of points
+#' @description Apply 2D transform to a matrix of points (N x 2 or N x 3).
+#'
+#' @param M The transformation matrix.
+#' @param pts Matrix with columns X, Y.
+#'
+#' @return Returns N x 2 matrix.
+#' @export
 homogeneousTrafoMatrix2D <- function(M, pts) {
   # pts: Matrix with columns X, Y
   n <- nrow(pts)
@@ -25,9 +35,16 @@ homogeneousTrafoMatrix2D <- function(M, pts) {
   return(t(res))
 }
 
-# Estimate 2D Rigid Body Transformation (SVD method)
-# X1, Y1: Local points (Source)
-# X2, Y2: World points (Target)
+#' @title Estimate 2D Rigid Body Transformation
+#' @description Estimate 2D Rigid Body Transformation (SVD method).
+#'
+#' @param X1 Local points (Source) X coordinates.
+#' @param Y1 Local points (Source) Y coordinates.
+#' @param X2 World points (Target) X coordinates.
+#' @param Y2 World points (Target) Y coordinates.
+#'
+#' @return A 4x4 transformation matrix.
+#' @export
 homogeneous2DSetTrafoFromVectors <- function(X1, Y1, X2, Y2) {
   # Centroids
   mx1 <- mean(X1); my1 <- mean(Y1)

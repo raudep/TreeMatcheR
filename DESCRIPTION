@@ -1,13 +1,25 @@
 Package: TreeMatcheR
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Co-Registration of Forest Stem Maps for Moving and Static Sensors
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: c(
+    person(given = "Raul", family = "de Paula Pires",
+           role = c("aut", "cre"),
+           email = "rauldepaulapires@gmail.com",
+           comment = c(ORCID = "0000-0001-6500-4289")),
+    person(given = "Kenneth", family = "Olofsson",
+           role = "ctb",
+           email = "kenneth.olofsson@slu.se"),
+    person(given = "Johan", family = "Holmgren",
+           role = "ctb")
+  )
+Description: Provides tools for the co-registration of single tree data in forest stands and forest plots, applicable to both static and dynamic data capture. The package implements a stem diameter weighted linking algorithm that improves linking accuracy when operating on diverse diameter stands with stem position errors. Additionally, it includes a co-registration quality metric threshold to discriminate between correct and incorrect stem map co-registrations with a high probability. This package implements the methodology described in Olofsson and Holmgren (2022) <doi:10.14214/sf.10712>, and was developed with the permission of the authors.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 URL: https://github.com/raudep/TreeMatcheR
 BugReports: https://github.com/raudep/TreeMatcheR/issues
+RoxygenNote: 7.3.3
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

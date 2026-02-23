@@ -1,20 +1,39 @@
-# R_mlsTools.R
-source("R/geometry.R")
-source("R/QuadTree.R")
-
-# --- File I/O ---
-
+#' @title Read a table
+#' @description Read a table from a file path.
+#'
+#' @param tablePath Path to the table file.
+#'
+#' @return A data frame containing the table data.
+#' @importFrom utils read.table
+#' @export
 tableRead <- function(tablePath) {
   if (!file.exists(tablePath)) stop(paste("File not found:", tablePath))
   read.table(tablePath, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 }
 
+#' @title Save a table
+#' @description Save a data frame to a file path.
+#'
+#' @param df The data frame to save.
+#' @param outPath The output file path.
+#'
+#' @return None.
+#' @importFrom utils write.table
+#' @export
 tableSave <- function(df, outPath) {
   write.table(df, file = outPath, sep = "\t", row.names = FALSE, quote = FALSE)
 }
 
 # --- Data Preparation ---
 
+#' @title Convert table to matrix
+#' @description Data Preparation. Converts a data frame to a matrix based on metadata.
+#'
+#' @param df The data frame to convert.
+#' @param meta Metadata list containing column labels and scale settings.
+#'
+#' @return A list containing IDs, the extracted matrix, and the original data frame.
+#' @export
 tableToMatrix <- function(df, meta) {
   get_col <- function(lbl, default=0.0) {
     if(!is.null(lbl) && lbl %in% names(df)) df[[lbl]] else rep(default, nrow(df))
@@ -37,6 +56,22 @@ tableToMatrix <- function(df, meta) {
 
 # --- Matcher ---
 
+#' @title Match local stems to world stems
+#' @description Matcher function. Evaluates translation and rotation hypotheses to align a local stem list to a world stem list.
+#'
+#' @param worldObj World object list containing the matrix of world points.
+#' @param localObj Local object list containing the matrix of local points.
+#' @param searchRes Search resolution for grid steps.
+#' @param searchDist Maximum search distance.
+#' @param linkDist Link distance threshold for identifying valid neighbors.
+#' @param cellSize Cell size for the spatial grid index.
+#' @param estX0 Estimated X coordinate for the center in world space.
+#' @param estY0 Estimated Y coordinate for the center in world space.
+#' @param midXLocal Optional. Local center X coordinate.
+#' @param midYLocal Optional. Local center Y coordinate.
+#'
+#' @return A list containing the 4x4 transformation matrix (M), local indices (lIndices), and world indices (wIndices).
+#' @export
 stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, cellSize,
                           estX0, estY0, midXLocal=NULL, midYLocal=NULL) {
 
@@ -107,7 +142,7 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
   cat(sprintf("Evaluating %d hypotheses (Method: Exact Python Replication)...\n", nrow(grid_params)))
 
   bestWeight <- -1.0
-  bestIdx <- 0
+  bestIdx <- 1
 
   # Pre-compute Rotations
   unique_thetas <- unique(grid_params$theta)
@@ -255,6 +290,19 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
 
 # --- Wrapper ---
 
+#' @title Wrapper for Matcher
+#' @description Wrapper to run the matcher, get the link table, and compute the local transformation matrix.
+#'
+#' @param tbWorld Data frame of the world table.
+#' @param tbLocal Data frame of the local table.
+#' @param metaWorld Metadata list for the world table.
+#' @param metaLocal Metadata list for the local table.
+#' @param searchDist Maximum search distance.
+#' @param estX0 Estimated X coordinate for the center in world space.
+#' @param estY0 Estimated Y coordinate for the center in world space.
+#'
+#' @return A list containing the linked table (tbLink) and the transformation matrix (M).
+#' @export
 tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorld, metaLocal,
                                                       searchDist, estX0, estY0) {
 
@@ -284,6 +332,18 @@ tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorl
   return(list(tbLink=tbRes, M=res$M))
 }
 
+#' @title Calculate Link Stats
+#' @description Calculate distance statistics for linked coordinates.
+#'
+#' @param df Data frame containing linked points.
+#' @param lblX1 Column name for the X coordinate of the first set.
+#' @param lblY1 Column name for the Y coordinate of the first set.
+#' @param lblX2 Column name for the X coordinate of the second set.
+#' @param lblY2 Column name for the Y coordinate of the second set.
+#'
+#' @return A list containing the mean, standard deviation, minimum, and maximum of the distances.
+#' @importFrom stats sd
+#' @export
 tableCalculateLinkStats <- function(df, lblX1, lblY1, lblX2, lblY2) {
   linked <- df[df$isLinked == 1, ]
   if (nrow(linked) == 0) return(list(0,0,0,0))

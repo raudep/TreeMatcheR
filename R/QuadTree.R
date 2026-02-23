@@ -1,9 +1,14 @@
 # QuadTree.R
-# Implements a Spatial Grid Index for fast neighbor lookups
+# Implements a Spatial Grid Index for fast neighborhood search
 
-# Create a Grid Index from a Matrix of coordinates
-# pts: Matrix (N x 2) with X, Y
-# cellSize: Size of grid bins
+#' @title Create a Grid Index from a Matrix of coordinates
+#' @description Create a Grid Index from a Matrix of coordinates. Implements a Spatial Grid Index for fast neighborhood search.
+#'
+#' @param pts Matrix (N x 2) with X, Y.
+#' @param cellSize Size of grid bins.
+#'
+#' @return An object of class "GridIndex" containing the index, cellSize, and pts.
+#' @export
 gridIndexCreate <- function(pts, cellSize) {
   # Calculate integer cell coordinates
   # We use floor() to bucket points
@@ -24,10 +29,15 @@ gridIndexCreate <- function(pts, cellSize) {
   ), class = "GridIndex")
 }
 
-# Query the Grid for candidates near multiple query points
-# queryPts: Matrix (M x 2)
-# radius: Search radius
-# Returns: List of integer vectors (indices in the original pts matrix)
+#' @title Query the Grid for candidates near multiple query points
+#' @description Query the Grid for candidates near multiple query points.
+#'
+#' @param grid The GridIndex object.
+#' @param queryPts Matrix (M x 2).
+#' @param radius Search radius.
+#'
+#' @return List of integer vectors (indices in the original pts matrix).
+#' @export
 gridIndexQueryBatch <- function(grid, queryPts, radius) {
   # Range of cells to check (radius determines how many neighbor cells)
   delta <- ceiling(radius / grid$cellSize)
@@ -70,9 +80,19 @@ gridIndexQueryBatch <- function(grid, queryPts, radius) {
   return(candidates)
 }
 
-# Helper to verify exact distance after grid pruning
-# Returns indices of World points within radius of Query points
-# Returns: List of vectors
+#' @title Helper to verify exact distance after grid pruning
+#' @description Helper to verify exact distance after grid pruning. Returns indices of World points within radius of Query points.
+#'
+#' @param queryPts Matrix of query points.
+#' @param worldPts Matrix of world points.
+#' @param candidatesList List of candidate indices.
+#' @param radius Search radius.
+#' @param queryRadii Radii for query points.
+#' @param worldRadii Radii for world points.
+#' @param useWeighted Logical flag to use weighted distances.
+#'
+#' @return List of vectors (list of lists containing valid indices and distances).
+#' @export
 filterByDistance <- function(queryPts, worldPts, candidatesList, radius, queryRadii, worldRadii, useWeighted) {
 
   res <- vector("list", nrow(queryPts))

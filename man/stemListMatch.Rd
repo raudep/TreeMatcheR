@@ -39,8 +39,8 @@ stemListMatch(
 \item{midYLocal}{Optional. Local center Y coordinate.}
 }
 \value{
-A list containing the 4x4 transformation matrix (M), local indices (lIndices), and world indices (wIndices).
+A list containing the 4x4 transformation matrix (M), local indices ("lIndices"), and world indices ("wIndices").
 }
 \description{
-Matcher function. Evaluates translation and rotation hypotheses to align a local stem list to a world stem list.
+Function for matching tree coordinates. Evaluates translation and rotation hypotheses to align a local stem list to a world stem list.
 }

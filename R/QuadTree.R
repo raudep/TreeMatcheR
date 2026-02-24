@@ -7,7 +7,7 @@
 #' @param pts Matrix (N x 2) with X, Y.
 #' @param cellSize Size of grid bins.
 #'
-#' @return An object of class "GridIndex" containing the index, cellSize, and pts.
+#' @return An object of class "GridIndex" containing the index, cell size, and points.
 #' @export
 gridIndexCreate <- function(pts, cellSize) {
   # Calculate integer cell coordinates

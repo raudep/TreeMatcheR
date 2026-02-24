@@ -12,7 +12,7 @@ gridIndexCreate(pts, cellSize)
 \item{cellSize}{Size of grid bins.}
 }
 \value{
-An object of class "GridIndex" containing the index, cellSize, and pts.
+An object of class "GridIndex" containing the index, cell size, and points.
 }
 \description{
 Create a Grid Index from a Matrix of coordinates. Implements a Spatial Grid Index for fast neighborhood search.

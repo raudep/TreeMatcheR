@@ -54,10 +54,8 @@ tableToMatrix <- function(df, meta) {
   list(ids=as.character(ids), mat=mat, df_orig=df)
 }
 
-# --- Matcher ---
-
 #' @title Match local stems to world stems
-#' @description Matcher function. Evaluates translation and rotation hypotheses to align a local stem list to a world stem list.
+#' @description Function for matching tree coordinates. Evaluates translation and rotation hypotheses to align a local stem list to a world stem list.
 #'
 #' @param worldObj World object list containing the matrix of world points.
 #' @param localObj Local object list containing the matrix of local points.
@@ -70,7 +68,7 @@ tableToMatrix <- function(df, meta) {
 #' @param midXLocal Optional. Local center X coordinate.
 #' @param midYLocal Optional. Local center Y coordinate.
 #'
-#' @return A list containing the 4x4 transformation matrix (M), local indices (lIndices), and world indices (wIndices).
+#' @return A list containing the 4x4 transformation matrix (M), local indices ("lIndices"), and world indices ("wIndices").
 #' @export
 stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, cellSize,
                           estX0, estY0, midXLocal=NULL, midYLocal=NULL) {
@@ -301,7 +299,7 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
 #' @param estX0 Estimated X coordinate for the center in world space.
 #' @param estY0 Estimated Y coordinate for the center in world space.
 #'
-#' @return A list containing the linked table (tbLink) and the transformation matrix (M).
+#' @return A list containing the linked table ("tbLink") and the transformation matrix (M).
 #' @export
 tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorld, metaLocal,
                                                       searchDist, estX0, estY0) {

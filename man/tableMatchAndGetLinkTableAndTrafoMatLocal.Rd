@@ -30,7 +30,7 @@ tableMatchAndGetLinkTableAndTrafoMatLocal(
 \item{estY0}{Estimated Y coordinate for the center in world space.}
 }
 \value{
-A list containing the linked table (tbLink) and the transformation matrix (M).
+A list containing the linked table ("tbLink") and the transformation matrix (M).
 }
 \description{
 Wrapper to run the matcher, get the link table, and compute the local transformation matrix.

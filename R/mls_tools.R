@@ -283,7 +283,7 @@ stemListMatch <- function(worldObj, localObj, searchRes, searchDist, linkDist, c
     )
   }
 
-  return(list(M=M, lIndices=l_indices, wIndices=w_indices))
+  return(list(M=M, lIndices=l_indices, wIndices=w_indices, theta = bestP$theta))
 }
 
 # --- Wrapper ---
@@ -327,7 +327,7 @@ tableMatchAndGetLinkTableAndTrafoMatLocal <- function(tbWorld, tbLocal, metaWorl
     for(c in wCols) tbRes[res$lIndices, paste0(c, "_w")] <- tbWorld[res$wIndices, c]
   }
 
-  return(list(tbLink=tbRes, M=res$M))
+  return(list(tbLink=tbRes, M=res$M, theta = res$theta))
 }
 
 #' @title Calculate Link Stats

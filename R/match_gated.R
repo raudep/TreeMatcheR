@@ -40,7 +40,7 @@ stemListMatchGated <- function(worldObj, localObj, estX0, estY0,
   lMat <- localObj$mat
   flag <- "ok"
 
-  # 1. Field trees to use: all rows with valid x, y and size -------------------
+  # 1. Field trees to use: all rows with valid x, y and size --------------------
   #    (filtering to detectable trees is the caller's job)
   ok <- !is.na(lMat[, 1]) & !is.na(lMat[, 2]) & !is.na(lMat[, 3])
   cand <- which(ok)

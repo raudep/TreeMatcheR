@@ -21,6 +21,6 @@ URL: https://github.com/raudep/TreeMatcheR
 BugReports: https://github.com/raudep/TreeMatcheR/issues
 RoxygenNote: 7.3.3
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
     clue
 Config/testthat/edition: 3
